@@ -77,6 +77,7 @@ This repo is intentionally broad. A folder might be a one-file demo, a weekend e
 | Project | Focus |
 | --- | --- |
 | [`LuaJIT`](./LuaJIT) | A Love2D performance sandbox showing the impact of LuaJIT on heavy numeric workloads. |
+| [`balatro-copy`](./balatro-copy) | A LÖVE Balatro scoring sandbox: configure cards, jokers, hand levels & modifiers, see a full score breakdown. |
 
 ---
 
