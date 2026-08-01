@@ -1,0 +1,15 @@
+{
+  "name": "ngraph-pixel-example",
+  "private": true,
+  "scripts": {
+    "build": "browserify index.js > bundle.js",
+    "start": "python3 -m http.server 8080"
+  },
+  "dependencies": {
+    "ngraph.graph": "^0.0.12",
+    "ngraph.pixel": "^2.4.1"
+  },
+  "devDependencies": {
+    "browserify": "^9.0.8"
+  }
+}
