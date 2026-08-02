@@ -5,5 +5,7 @@ build/shots*/
 build/candidates/
 build/originals/
 build/frames/
+build/sequence/
+build/sequence-from-video/
 build/sheet-*.png
 build/sheet-*.jpg

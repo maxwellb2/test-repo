@@ -2,8 +2,8 @@
 
 A working demo of [`oso95/scroll-world`](https://github.com/oso95/scroll-world): one
 continuous camera flight through six Major League ballparks, driven entirely by scroll
-position. Fenway to Wrigley to Oracle Park to PNC to Dodger Stadium to Camden Yards,
-with no cuts anywhere in the chain.
+position. Fenway → Wrigley → Oracle Park → PNC → Dodger Stadium → Camden Yards → **back
+to Fenway**, with no cuts anywhere in the chain. The last frame of the flight is the first.
 
 ![preview](preview.jpg)
 
@@ -18,9 +18,11 @@ Then scroll slowly, and scroll back up. Two things are worth watching for:
 
 1. **The camera moves; it isn't a parallax trick.** Scroll drives *time* through a real
    video clip, so the motion has perspective and parallax that CSS transforms can't fake.
-2. **You never see a cut.** Between each pair of ballparks there's a connector clip whose
-   first frame *is* the previous dive's last frame, and whose last frame *is* the next
-   dive's first frame. Fifteen viewport-heights of scroll, eleven clips, no visible joins.
+2. **You never see a cut.** Between each pair of ballparks — including the wrap home —
+   there's a connector clip whose first frame *is* the previous dive's last frame, and
+   whose last frame *is* the next dive's first frame.
+3. **It closes.** Scroll to the end and you're looking at the opening shot again. There's
+   also a shareable `assets/vid/flight-loop.mp4` that loops the same way.
 
 ## What this actually demonstrates
 
@@ -34,9 +36,10 @@ orchestrates a pipeline. Two separable things ship inside it:
 
 **This demo uses the engine unmodified and replaces the paid half.** `scrub-engine.js` here
 is byte-identical to upstream (sha256 `630bb1ab…`), so what you're judging is the real
-thing, not a fork. Rather than pay a video model to generate camera moves,
-`build/render_flight.py` synthesises them locally: every frame is a crop out of a
-high-resolution photograph, animated with an eased camera path and encoded with ffmpeg.
+thing, not a fork. Camera moves are synthesised locally from photographs today
+(`build/render_continuous.py` → `build/slice_sequence.py`). The same slicer accepts an
+Earth Studio PNG dump or continuous video — see [`EARTH_STUDIO.md`](EARTH_STUDIO.md) —
+so you can swap in real 3D camera flights without changing the page.
 
 That substitution is the most useful result of the evaluation. The engine is the part you'd
 actually depend on, and it does not care where the pixels came from — so you can adopt the
@@ -121,38 +124,38 @@ Findings from the build, all of which apply whether or not you use the paid pipe
 ## Rebuilding the assets
 
 Nothing here needs an API key, an account, or `brew` — `imageio-ffmpeg` ships a static
-ffmpeg binary.
+ffmpeg binary. The closed-loop path:
 
 ```bash
 pip3 install imageio-ffmpeg pillow numpy
 
-python3 build/prepare_bases.py   # fetch the six photos, normalise to 3200x1800 bases
-python3 build/render_flight.py   # render + encode the 22 clips (~2 min)
-python3 build/verify.py          # inventory, GOP check, decoded seam check
+python3 build/prepare_bases.py       # fetch + normalise the six photos
+python3 build/timeline.py            # print keyframes / frame counts
+python3 build/render_continuous.py   # 751-frame closed loop → build/sequence/
+python3 build/slice_sequence.py      # cut into dives + connectors + flight-loop.mp4
+python3 build/verify.py              # decoded seams + loop close
 ```
 
-`prepare_bases.py` pins each photo by explicit Commons filename, so a rebuild reproduces
-the current bases exactly rather than re-rolling whatever search ranks first today. Two
-optional tools are how those six were chosen in the first place, for when you want
-different ballparks:
+To swap in Earth Studio footage later, drop frames (or a continuous video) in and run
+the same slicer — details in [`EARTH_STUDIO.md`](EARTH_STUDIO.md):
 
 ```bash
-python3 build/find_photos.py       # search Commons, filtered by title and aspect ratio
-python3 build/shortlist.py         # download candidates + contact sheets to eyeball
-python3 build/preview_focal.py     # aim a dive: renders only its final frame
-python3 build/encode_tradeoffs.py  # re-measure the encode trade-offs above
+python3 build/slice_sequence.py --seq build/sequence
+# or: python3 build/slice_sequence.py --video /path/to/export.mp4
 ```
 
-Search relevance alone is unreliable here — a "Dodger Stadium panorama" query returns
-Marlins Park, and "PNC Park" returns PNC Field, a different minor-league park — which is
-why the discovery scripts filter on title keywords and why the picks get eyeballed on a
-contact sheet before being pinned.
+`prepare_bases.py` pins each photo by explicit Commons filename. Discovery helpers if you
+want different ballparks:
 
-To change the flight, edit `SCENES` in `build/render_flight.py` — each entry is a slug, a
-normalised `focal` point the camera dives toward, and a `drift` that steers its exit.
-`prepare_bases.py` writes `build/sheet-grid.png` with a normalised coordinate grid so focal
-points can be read straight off it. Then mirror the ordering in the `sections` and
-`connectors` arrays in `index.html`.
+```bash
+python3 build/find_photos.py
+python3 build/shortlist.py
+python3 build/preview_focal.py
+python3 build/encode_tradeoffs.py
+```
+
+Edit the flight in `build/timeline.py` (coordinates, frame counts, park order), then
+mirror the ordering in `index.html`.
 
 An optional visual regression pass drives the page in real Chrome:
 

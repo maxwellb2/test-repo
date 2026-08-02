@@ -1,0 +1,25 @@
+{
+  "source": "build/sequence",
+  "loop_delta": 0.0,
+  "seams_ok": true,
+  "clips": {
+    "dives": [
+      "fenway",
+      "wrigley",
+      "oracle",
+      "pnc",
+      "dodger",
+      "camden",
+      "home"
+    ],
+    "connectors": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "loop": "flight-loop.mp4"
+  }
+}
