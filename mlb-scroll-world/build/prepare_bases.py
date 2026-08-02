@@ -21,8 +21,7 @@ CHOSEN = {
     "wrigley": "Wrigley Field in line with home plate.jpg",
     "oracle":  "ATT Sunset Panorama.jpg",
     "pnc":     "PNC Park with Roberto Clemente Bridge May 2018.jpg",
-    "dodger":  "Flickr - Official U.S. Navy Imagery - Sailor on Navy Parachute Team "
-               "displays an American flag above Dodger Stadium during a baseball game.jpg",
+    "dodger":  "Dodger Stadium and DTLA.jpg",
     "camden":  "Oriole Park at Camden Yards with Baltimore skyline in the "
                "background in 2023.jpg",
 }

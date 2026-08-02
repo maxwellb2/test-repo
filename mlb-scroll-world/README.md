@@ -2,8 +2,14 @@
 
 A working demo of [`oso95/scroll-world`](https://github.com/oso95/scroll-world): one
 continuous camera flight through six Major League ballparks, driven entirely by scroll
-position. Fenway → Wrigley → Oracle Park → PNC → Dodger Stadium → Camden Yards → **back
+position. Each park gets an **approach** (lateral truck + push) and an **arrival**
+(orbit to a tight hold) — twelve beats total — then wraps Fenway → … → Camden → **back
 to Fenway**, with no cuts anywhere in the chain. The last frame of the flight is the first.
+
+Camera motion is no longer a flat crop. Depth Anything V2 estimates a depth map per
+photo; each frame is a depth-aware warp so near content (bridges, decks) parallaxes past
+far content (skylines, water). A plane-homography A/B lives under `assets/vid-plane/` if
+you want to compare.
 
 ![preview](preview.jpg)
 
@@ -36,10 +42,12 @@ orchestrates a pipeline. Two separable things ship inside it:
 
 **This demo uses the engine unmodified and replaces the paid half.** `scrub-engine.js` here
 is byte-identical to upstream (sha256 `630bb1ab…`), so what you're judging is the real
-thing, not a fork. Camera moves are synthesised locally from photographs today
-(`build/render_continuous.py` → `build/slice_sequence.py`). The same slicer accepts an
-Earth Studio PNG dump or continuous video — see [`EARTH_STUDIO.md`](EARTH_STUDIO.md) —
-so you can swap in real 3D camera flights without changing the page.
+thing, not a fork. Camera moves are synthesised locally from photographs today via a
+depth-aware warp (`build/render_continuous_3d.py --method depth` →
+`build/slice_sequence.py`). A plane-homography fallback (`--method plane`) is kept under
+`assets/vid-plane/` for A/B. The same slicer accepts an Earth Studio PNG dump or continuous
+video — see [`EARTH_STUDIO.md`](EARTH_STUDIO.md) — so you can swap in real 3D camera flights
+without changing the page.
 
 That substitution is the most useful result of the evaluation. The engine is the part you'd
 actually depend on, and it does not care where the pixels came from — so you can adopt the
@@ -100,8 +108,8 @@ Findings from the build, all of which apply whether or not you use the paid pipe
 
   Quality is the bigger lever and stays fully negotiable: at `-g 8`, crf 20 costs 15.84 MB
   where crf 26 costs 8.27 MB. Reproduce both tables with `python3
-  build/encode_tradeoffs.py`. All in, the demo is 47 MB desktop + 26 MB mobile for ~30
-  seconds of flight.
+  build/encode_tradeoffs.py`. All in, the demo is ~100 MB desktop + ~55 MB mobile for
+  ~62 seconds of flight (12 beats), plus an optional `flight-loop.mp4` export.
 - **Skip the pre-denoise.** Packed crowds look like exactly the high-frequency noise a
   denoiser should help with, and it seemed an obvious win, but `hqdn3d` measured at under
   2% of file size on this material while slightly *widening* the seam delta. It's not in the
@@ -110,8 +118,8 @@ Findings from the build, all of which apply whether or not you use the paid pipe
   finely the flight can be scrubbed. Dropping 30 → 24 cost nothing perceptible and saved
   20%.
 - **Everything loads as a Blob and stays in memory.** `loadClip()` fetches each clip via
-  `fetch()` → `URL.createObjectURL` and never revokes it. Fine at eleven clips; worth
-  patching before you scale to thirty ballparks.
+  `fetch()` → `URL.createObjectURL` and never revokes it. Fine at ~25 clips; worth
+  patching before you scale much further.
 - **The engine degrades honestly.** Under `prefers-reduced-motion` it never loads video at
   all and cross-dissolves the stills instead. A missing or 404ing clip falls back to its
   poster, and a null connector becomes a plain crossfade — a scene failing to render can't
@@ -123,17 +131,30 @@ Findings from the build, all of which apply whether or not you use the paid pipe
 
 ## Rebuilding the assets
 
-Nothing here needs an API key, an account, or `brew` — `imageio-ffmpeg` ships a static
-ffmpeg binary. The closed-loop path:
+Nothing here needs an API key or account beyond a one-time Depth Anything V2 ONNX
+download. `imageio-ffmpeg` ships a static ffmpeg binary. The closed-loop path:
 
 ```bash
-pip3 install imageio-ffmpeg pillow numpy
+pip3 install imageio-ffmpeg pillow numpy onnxruntime
 
-python3 build/prepare_bases.py       # fetch + normalise the six photos
-python3 build/timeline.py            # print keyframes / frame counts
-python3 build/render_continuous.py   # 751-frame closed loop → build/sequence/
-python3 build/slice_sequence.py      # cut into dives + connectors + flight-loop.mp4
-python3 build/verify.py              # decoded seams + loop close
+# Depth Anything V2 Small → build/models/depth_anything_v2_small.onnx
+# (see build/depth.py for the expected path)
+
+python3 build/prepare_bases.py                          # fetch + normalise the six photos
+python3 build/depth.py                                  # cache per-park depth maps
+python3 build/timeline.py                               # print keyframes / frame counts
+python3 build/render_continuous_3d.py --method depth    # 1501-frame loop → build/sequence-depth/
+python3 build/slice_sequence.py --seq build/sequence-depth --out assets/vid
+python3 build/verify.py                                 # decoded seams + loop close
+```
+
+A/B against the plane renderer:
+
+```bash
+python3 build/render_continuous_3d.py --method plane
+python3 build/slice_sequence.py --seq build/sequence-plane --out assets/vid-plane --skip-loop
+python3 build/compare_methods.py                        # build/compare-methods.jpg
+# Then flip `const VID` in index.html between 'assets/vid' and 'assets/vid-plane'.
 ```
 
 To swap in Earth Studio footage later, drop frames (or a continuous video) in and run
@@ -189,7 +210,7 @@ attribution:
 | [Wrigley Field](https://commons.wikimedia.org/wiki/File:Wrigley_Field_in_line_with_home_plate.jpg) | Sea Cow | CC BY-SA 4.0 |
 | [Oracle Park](https://commons.wikimedia.org/wiki/File:ATT_Sunset_Panorama.jpg) | Bspangenberg | CC BY 3.0 |
 | [PNC Park](https://commons.wikimedia.org/wiki/File:PNC_Park_with_Roberto_Clemente_Bridge_May_2018.jpg) | Y2kcrazyjoker4 | CC BY-SA 4.0 |
-| [Dodger Stadium](https://commons.wikimedia.org/wiki/File:Flickr_-_Official_U.S._Navy_Imagery_-_Sailor_on_Navy_Parachute_Team_displays_an_American_flag_above_Dodger_Stadium_during_a_baseball_game.jpg) | James Woods, U.S. Navy | Public domain |
+| [Dodger Stadium](https://commons.wikimedia.org/wiki/File:Dodger_Stadium_and_DTLA.jpg) | Cody Williams | CC BY-SA 4.0 |
 | [Camden Yards](https://commons.wikimedia.org/wiki/File:Oriole_Park_at_Camden_Yards_with_Baltimore_skyline_in_the_background_in_2023.jpg) | Quintin Soloviev | CC BY 4.0 |
 
 `scrub-engine.js` is MIT, from `oso95/scroll-world`. Team colours and marks belong to their

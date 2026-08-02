@@ -4,11 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>The Cathedrals — a continuous flight through six MLB ballparks</title>
-<meta name="description" content="Scroll-scrubbed camera flight through six Major League ballparks.">
+<meta name="description" content="Scroll-scrubbed camera flight through six Major League ballparks — approach and arrival at each park, closed loop.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23f4f7fa'/%3E%3Cpath d='M7 6q6 10 0 20M25 6q-6 10 0 20' stroke='%23BD3039' stroke-width='2' fill='none'/%3E%3C/svg%3E">
 <style>
-  /* The engine wraps its own CSS in @layer sw, so these unlayered tokens win
-     regardless of load order — which is what makes a dark theme clean here. */
   :root, .sw-root {
     --sw-bg: #0a0e14;
     --sw-ink: #f4f7fa;
@@ -17,8 +15,6 @@
     --sw-font-display: ui-rounded, "SF Pro Rounded", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   }
 
-  /* The engine's default buttons and pills assume dark ink on a light page.
-     Invert them so they stay legible against the dark theme. */
   .sw-root .sw-topcta,
   .sw-root .sw-btn--primary { color: #0a0e14; background: var(--sw-ink); }
   .sw-root .sw-btn--ghost { color: var(--sw-ink); border-color: color-mix(in srgb, var(--sw-ink) 32%, transparent); }
@@ -30,11 +26,6 @@
   }
   .sw-root .sw-route__label { color: var(--sw-ink); background: color-mix(in srgb, #0a0e14 78%, transparent); }
 
-  /* Photographs carry more detail than the generated dioramas the engine was
-     built for, so the copy side needs a heavier scrim than the default — a
-     bright sky behind a light accent (Pittsburgh's gold) is otherwise
-     unreadable. Keep the axis at 90deg: any other angle stops short of the
-     box's far corner and leaves a hard vertical edge. */
   .sw-root .sw-copylayer::before {
     background: linear-gradient(90deg,
       color-mix(in srgb, var(--sw-bg) 97%, transparent) 0%,
@@ -63,109 +54,180 @@
 
   <script src="scrub-engine.js"></script>
   <script>
+    // Clip root — swap to assets/vid-plane to A/B the homography renderer.
+    const VID = 'assets/vid';
+
     mountScrollWorld(document.getElementById('world'), {
       brand: { name: 'The Cathedrals', href: '#top' },
       cta: { label: 'Back home', href: '#home' },
       hint: 'scroll to fly in',
 
-      // Viewport-heights of scroll per clip. Longer = slower, more deliberate
-      // camera. Six parks + wrap home ≈ 17 screens.
-      diveScroll: 1.5,
-      connScroll: 0.95,
+      // Twelve beats (approach + arrival × 6) + wrap home ≈ 28 screens.
+      diveScroll: 1.35,
+      connScroll: 0.75,
 
       sections: [
         {
-          id: 'fenway', label: 'Fenway', accent: '#BD3039',
-          still: 'assets/fenway.jpg',
-          clip: 'assets/vid/dive-fenway.mp4',
-          clipMobile: 'assets/vid/dive-fenway-m.mp4',
-          scroll: 1.7, linger: 0.42,
-          eyebrow: 'Boston \u00b7 1912',
+          id: 'fenway-approach', label: 'Fenway', accent: '#BD3039',
+          still: 'assets/fenway-approach.jpg',
+          clip: `${VID}/dive-fenway-approach.mp4`,
+          clipMobile: `${VID}/dive-fenway-approach-m.mp4`,
+          scroll: 1.5, linger: 0.28,
+          eyebrow: 'Boston · 1912',
           title: 'Where the wall is a character.',
           body: 'The oldest park still in the league, wedged into the Fens at angles ' +
                 'no architect would choose. Left field ran out of room at 310 feet, ' +
                 'so they built up instead of out.',
-          tags: ['Opened 1912', 'Green Monster \u2014 37\u00a0ft 2\u00a0in', '37,755 seats'],
+          tags: ['Opened 1912', 'Green Monster — 37 ft 2 in'],
         },
         {
-          id: 'wrigley', label: 'Wrigley', accent: '#0E3386',
-          still: 'assets/wrigley.jpg',
-          clip: 'assets/vid/dive-wrigley.mp4',
-          clipMobile: 'assets/vid/dive-wrigley-m.mp4',
-          scroll: 1.6, linger: 0.38,
-          eyebrow: 'Chicago \u00b7 1914',
+          id: 'fenway-arrival', label: 'Fenway · close', accent: '#BD3039',
+          still: 'assets/fenway-arrival.jpg',
+          clip: `${VID}/dive-fenway-arrival.mp4`,
+          clipMobile: `${VID}/dive-fenway-arrival-m.mp4`,
+          scroll: 1.35, linger: 0.38,
+          eyebrow: 'The Monster',
+          title: 'Thirty-seven feet of green.',
+          body: 'Push in past the seats and the wall stops being a postcard and starts ' +
+                'being a surface — hand-operated scoreboard, ladder, and all.',
+          tags: ['37,755 seats'],
+        },
+        {
+          id: 'wrigley-approach', label: 'Wrigley', accent: '#0E3386',
+          still: 'assets/wrigley-approach.jpg',
+          clip: `${VID}/dive-wrigley-approach.mp4`,
+          clipMobile: `${VID}/dive-wrigley-approach-m.mp4`,
+          scroll: 1.45, linger: 0.28,
+          eyebrow: 'Chicago · 1914',
           title: 'Ivy on brick, scoreboard by hand.',
           body: 'Two years younger than Fenway and just as stubborn. The outfield ' +
                 'wall grows its own padding, and the center-field scoreboard has ' +
                 'been turned by hand from the inside since 1937.',
-          tags: ['Opened 1914', 'Ivy planted 1937', 'Lights arrived 1988'],
+          tags: ['Opened 1914', 'Ivy planted 1937'],
         },
         {
-          id: 'oracle', label: 'Oracle Park', accent: '#FD5A1E',
-          still: 'assets/oracle.jpg',
-          clip: 'assets/vid/dive-oracle.mp4',
-          clipMobile: 'assets/vid/dive-oracle-m.mp4',
-          scroll: 1.5,
-          eyebrow: 'San Francisco \u00b7 2000',
+          id: 'wrigley-arrival', label: 'Wrigley · close', accent: '#0E3386',
+          still: 'assets/wrigley-arrival.jpg',
+          clip: `${VID}/dive-wrigley-arrival.mp4`,
+          clipMobile: `${VID}/dive-wrigley-arrival-m.mp4`,
+          scroll: 1.35, linger: 0.38,
+          eyebrow: 'Waveland & Sheffield',
+          title: 'A neighborhood with a diamond.',
+          body: 'Rooftops sell tickets across the street. The park never sprawled; ' +
+                'the city pressed in instead.',
+          tags: ['Lights arrived 1988'],
+        },
+        {
+          id: 'oracle-approach', label: 'Oracle Park', accent: '#FD5A1E',
+          still: 'assets/oracle-approach.jpg',
+          clip: `${VID}/dive-oracle-approach.mp4`,
+          clipMobile: `${VID}/dive-oracle-approach-m.mp4`,
+          scroll: 1.4, linger: 0.28,
+          eyebrow: 'San Francisco · 2000',
           title: 'Right field is the Bay.',
-          body: 'A 24-foot wall in right \u2014 Willie Mays\u2019 number \u2014 and ' +
-                'past it, open water. Kayakers idle in McCovey Cove waiting for the ' +
-                'ball that clears everything.',
-          tags: ['Opened 2000', '24\u00a0ft right-field wall', 'McCovey Cove'],
+          body: 'A 24-foot wall in right — Willie Mays’ number — and past it, open ' +
+                'water. Kayakers idle in McCovey Cove waiting for the ball that ' +
+                'clears everything.',
+          tags: ['Opened 2000', 'McCovey Cove'],
         },
         {
-          id: 'pnc', label: 'PNC Park', accent: '#FDB827',
-          still: 'assets/pnc.jpg',
-          clip: 'assets/vid/dive-pnc.mp4',
-          clipMobile: 'assets/vid/dive-pnc-m.mp4',
-          scroll: 1.6, linger: 0.45,
-          eyebrow: 'Pittsburgh \u00b7 2001',
+          id: 'oracle-arrival', label: 'Oracle · close', accent: '#FD5A1E',
+          still: 'assets/oracle-arrival.jpg',
+          clip: `${VID}/dive-oracle-arrival.mp4`,
+          clipMobile: `${VID}/dive-oracle-arrival-m.mp4`,
+          scroll: 1.35, linger: 0.38,
+          eyebrow: 'McCovey Cove',
+          title: 'Splash hits only.',
+          body: 'The camera settles over the cove — where the park stops being a ' +
+                'building and becomes a shoreline.',
+          tags: ['24 ft right-field wall'],
+        },
+        {
+          id: 'pnc-approach', label: 'PNC Park', accent: '#FDB827',
+          still: 'assets/pnc-approach.jpg',
+          clip: `${VID}/dive-pnc-approach.mp4`,
+          clipMobile: `${VID}/dive-pnc-approach-m.mp4`,
+          scroll: 1.45, linger: 0.28,
+          eyebrow: 'Pittsburgh · 2001',
           title: 'Two decks, on purpose.',
           body: 'Built deliberately small so nothing sits between you and the ' +
                 'Allegheny, the yellow spans of the Clemente Bridge, and the ' +
-                'skyline behind them. Widely called the best view in the sport.',
-          tags: ['Opened 2001', 'Only two decks', 'Clemente Bridge'],
+                'skyline behind them.',
+          tags: ['Opened 2001', 'Clemente Bridge'],
         },
         {
-          id: 'dodger', label: 'Dodger Stadium', accent: '#005A9C',
-          still: 'assets/dodger.jpg',
-          clip: 'assets/vid/dive-dodger.mp4',
-          clipMobile: 'assets/vid/dive-dodger-m.mp4',
-          scroll: 1.5,
-          eyebrow: 'Los Angeles \u00b7 1962',
+          id: 'pnc-arrival', label: 'PNC · close', accent: '#FDB827',
+          still: 'assets/pnc-arrival.jpg',
+          clip: `${VID}/dive-pnc-arrival.mp4`,
+          clipMobile: `${VID}/dive-pnc-arrival-m.mp4`,
+          scroll: 1.35, linger: 0.42,
+          eyebrow: 'The best view in the sport',
+          title: 'Bridge, river, skyline.',
+          body: 'Parallax finally earns its keep here — the bridge slides past the ' +
+                'stadium as the camera trucks in.',
+          tags: ['Only two decks'],
+        },
+        {
+          id: 'dodger-approach', label: 'Dodger Stadium', accent: '#005A9C',
+          still: 'assets/dodger-approach.jpg',
+          clip: `${VID}/dive-dodger-approach.mp4`,
+          clipMobile: `${VID}/dive-dodger-approach-m.mp4`,
+          scroll: 1.4, linger: 0.28,
+          eyebrow: 'Los Angeles · 1962',
           title: 'Carved into a hillside.',
           body: 'Terraced into Chavez Ravine so every seating level enters at its ' +
-                'own grade \u2014 park on your tier, walk straight in. Still the ' +
-                'largest ballpark in baseball by capacity.',
-          tags: ['Opened 1962', '56,000 seats', 'Chavez Ravine'],
+                'own grade — park on your tier, walk straight in. Downtown waits ' +
+                'on the horizon.',
+          tags: ['Opened 1962', '56,000 seats'],
         },
         {
-          id: 'camden', label: 'Camden Yards', accent: '#DF4601',
-          still: 'assets/camden.jpg',
-          clip: 'assets/vid/dive-camden.mp4',
-          clipMobile: 'assets/vid/dive-camden-m.mp4',
-          scroll: 1.7,
+          id: 'dodger-arrival', label: 'Dodger · close', accent: '#005A9C',
+          still: 'assets/dodger-arrival.jpg',
+          clip: `${VID}/dive-dodger-arrival.mp4`,
+          clipMobile: `${VID}/dive-dodger-arrival-m.mp4`,
+          scroll: 1.35, linger: 0.38,
+          eyebrow: 'Chavez Ravine',
+          title: 'Stadium first, DTLA behind.',
+          body: 'The bowl holds while the skyline drifts — depth that a flat crop ' +
+                'could never invent.',
+          tags: ['Largest by capacity'],
+        },
+        {
+          id: 'camden-approach', label: 'Camden Yards', accent: '#DF4601',
+          still: 'assets/camden-approach.jpg',
+          clip: `${VID}/dive-camden-approach.mp4`,
+          clipMobile: `${VID}/dive-camden-approach-m.mp4`,
+          scroll: 1.5, linger: 0.28,
           eyebrow: 'And it all traces back to',
           title: 'The park that reset the century.',
           body: 'Camden Yards put brick, asymmetry and a downtown back into the ' +
-                'ballpark, and nearly everything built since has copied it. The ' +
-                'B&O Warehouse behind right field runs 1,016 feet \u2014 the longest ' +
-                'building on the East Coast.',
-          tags: ['Opened 1992', 'B&O Warehouse \u2014 1,016\u00a0ft'],
+                'ballpark, and nearly everything built since has copied it.',
+          tags: ['Opened 1992'],
         },
-        // Seventh section so the engine can play conn-5 (Camden → Fenway).
-        // The clip is the opening frame held; arriving here means the loop closed.
+        {
+          id: 'camden-arrival', label: 'Camden · close', accent: '#DF4601',
+          still: 'assets/camden-arrival.jpg',
+          clip: `${VID}/dive-camden-arrival.mp4`,
+          clipMobile: `${VID}/dive-camden-arrival-m.mp4`,
+          scroll: 1.4, linger: 0.42,
+          eyebrow: 'B&O Warehouse',
+          title: 'One thousand sixteen feet of brick.',
+          body: 'The warehouse behind right field runs the length of the block — ' +
+                'the longest building on the East Coast, and the reason the park ' +
+                'feels like a city.',
+          tags: ['B&O Warehouse — 1,016 ft'],
+        },
         {
           id: 'home', label: 'Home', accent: '#BD3039',
           still: 'assets/home.jpg',
-          clip: 'assets/vid/dive-home.mp4',
-          clipMobile: 'assets/vid/dive-home-m.mp4',
-          scroll: 1.2, linger: 0.55,
+          clip: `${VID}/dive-home.mp4`,
+          clipMobile: `${VID}/dive-home-m.mp4`,
+          scroll: 1.15, linger: 0.55,
           eyebrow: 'Back where we started',
           title: 'One continuous flight. No cuts.',
-          body: 'Fifteen hundred frames, six ballparks, and the last frame is the ' +
-                'first. Scroll up and the camera runs the whole thing in reverse.',
-          tags: ['Closed loop', 'Frame-locked seams'],
+          body: 'Fifteen hundred frames, twelve beats, six ballparks — and the last ' +
+                'frame is the first. Scroll up and the camera runs it in reverse.',
+          tags: ['Closed loop', 'Frame-locked seams', 'Depth parallax'],
           cta: {
             primary:   { label: 'Fly it again', href: '#top' },
             secondary: { label: 'MLB ballparks', href: 'https://www.mlb.com/ballparks' },
@@ -173,25 +235,8 @@
         },
       ],
 
-      // One connector per gap, including the wrap home (conn-5). Each opens on
-      // the previous dive's exact final frame and closes on the next dive's
-      // exact first frame — including Fenway's opening for the wrap.
-      connectors: [
-        'assets/vid/conn-0.mp4',
-        'assets/vid/conn-1.mp4',
-        'assets/vid/conn-2.mp4',
-        'assets/vid/conn-3.mp4',
-        'assets/vid/conn-4.mp4',
-        'assets/vid/conn-5.mp4',
-      ],
-      connectorsMobile: [
-        'assets/vid/conn-0-m.mp4',
-        'assets/vid/conn-1-m.mp4',
-        'assets/vid/conn-2-m.mp4',
-        'assets/vid/conn-3-m.mp4',
-        'assets/vid/conn-4-m.mp4',
-        'assets/vid/conn-5-m.mp4',
-      ],
+      connectors: Array.from({length: 12}, (_, i) => `${VID}/conn-${i}.mp4`),
+      connectorsMobile: Array.from({length: 12}, (_, i) => `${VID}/conn-${i}-m.mp4`),
     });
   </script>
 </body>

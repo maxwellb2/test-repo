@@ -1,15 +1,21 @@
 {
-  "source": "build/sequence",
+  "source": "build/sequence-depth",
   "loop_delta": 0.0,
   "seams_ok": true,
   "clips": {
     "dives": [
-      "fenway",
-      "wrigley",
-      "oracle",
-      "pnc",
-      "dodger",
-      "camden",
+      "fenway-approach",
+      "fenway-arrival",
+      "wrigley-approach",
+      "wrigley-arrival",
+      "oracle-approach",
+      "oracle-arrival",
+      "pnc-approach",
+      "pnc-arrival",
+      "dodger-approach",
+      "dodger-arrival",
+      "camden-approach",
+      "camden-arrival",
       "home"
     ],
     "connectors": [
@@ -18,7 +24,13 @@
       2,
       3,
       4,
-      5
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
     ],
     "loop": "flight-loop.mp4"
   }

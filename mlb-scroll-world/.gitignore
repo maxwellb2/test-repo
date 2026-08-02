@@ -6,6 +6,14 @@ build/candidates/
 build/originals/
 build/frames/
 build/sequence/
+build/sequence-plane/
+build/sequence-depth/
 build/sequence-from-video/
+build/depth/
+build/models/
 build/sheet-*.png
 build/sheet-*.jpg
+build/depth-*-test.png
+build/compare-*.jpg
+assets/vid-plane/
+assets/vid-depth/
