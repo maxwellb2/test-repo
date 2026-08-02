@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Cathedrals — a continuous flight through six MLB ballparks</title>
+<meta name="description" content="Scroll-scrubbed camera flight through six Major League ballparks.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23f4f7fa'/%3E%3Cpath d='M7 6q6 10 0 20M25 6q-6 10 0 20' stroke='%23BD3039' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<style>
+  /* The engine wraps its own CSS in @layer sw, so these unlayered tokens win
+     regardless of load order — which is what makes a dark theme clean here. */
+  :root, .sw-root {
+    --sw-bg: #0a0e14;
+    --sw-ink: #f4f7fa;
+    --sw-ink-soft: #8c9bab;
+    --sw-accent: #BD3039;
+    --sw-font-display: ui-rounded, "SF Pro Rounded", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  }
+
+  /* The engine's default buttons and pills assume dark ink on a light page.
+     Invert them so they stay legible against the dark theme. */
+  .sw-root .sw-topcta,
+  .sw-root .sw-btn--primary { color: #0a0e14; background: var(--sw-ink); }
+  .sw-root .sw-btn--ghost { color: var(--sw-ink); border-color: color-mix(in srgb, var(--sw-ink) 32%, transparent); }
+  .sw-root .sw-nav { background: color-mix(in srgb, #fff 8%, transparent); }
+  .sw-root .sw-copy__tags li {
+    color: color-mix(in srgb, var(--sw-accent) 62%, #fff);
+    background: color-mix(in srgb, var(--sw-accent) 16%, transparent);
+    border-color: color-mix(in srgb, var(--sw-accent) 40%, transparent);
+  }
+  .sw-root .sw-route__label { color: var(--sw-ink); background: color-mix(in srgb, #0a0e14 78%, transparent); }
+
+  /* Photographs carry more detail than the generated dioramas the engine was
+     built for, so the copy side needs a heavier scrim than the default — a
+     bright sky behind a light accent (Pittsburgh's gold) is otherwise
+     unreadable. Keep the axis at 90deg: any other angle stops short of the
+     box's far corner and leaves a hard vertical edge. */
+  .sw-root .sw-copylayer::before {
+    background: linear-gradient(90deg,
+      color-mix(in srgb, var(--sw-bg) 97%, transparent) 0%,
+      color-mix(in srgb, var(--sw-bg) 88%, transparent) 36%,
+      color-mix(in srgb, var(--sw-bg) 46%, transparent) 68%,
+      transparent 100%);
+  }
+
+  .credits {
+    position: fixed; z-index: 45; left: clamp(18px, 5vw, 64px); bottom: 14px;
+    font: 400 0.68rem/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    color: color-mix(in srgb, #8c9bab 70%, transparent);
+  }
+  .credits a { color: inherit; }
+  @media (max-width: 860px) { .credits { display: none; } }
+</style>
+</head>
+<body>
+  <div id="world"></div>
+
+  <p class="credits">
+    Ballpark photography from
+    <a href="https://commons.wikimedia.org/">Wikimedia Commons</a>
+    under CC&nbsp;BY / CC&nbsp;BY-SA / public domain &mdash; see README for per-image credit.
+  </p>
+
+  <script src="scrub-engine.js"></script>
+  <script>
+    mountScrollWorld(document.getElementById('world'), {
+      brand: { name: 'The Cathedrals', href: '#top' },
+      cta: { label: 'Where it started', href: '#camden' },
+      hint: 'scroll to fly in',
+
+      // Viewport-heights of scroll per clip. Longer = slower, more deliberate
+      // camera. The whole flight runs about 14 screens of scrolling.
+      diveScroll: 1.5,
+      connScroll: 0.95,
+
+      sections: [
+        {
+          id: 'fenway', label: 'Fenway', accent: '#BD3039',
+          still: 'assets/fenway.jpg',
+          clip: 'assets/vid/dive-fenway.mp4',
+          clipMobile: 'assets/vid/dive-fenway-m.mp4',
+          scroll: 1.7, linger: 0.42,
+          eyebrow: 'Boston \u00b7 1912',
+          title: 'Where the wall is a character.',
+          body: 'The oldest park still in the league, wedged into the Fens at angles ' +
+                'no architect would choose. Left field ran out of room at 310 feet, ' +
+                'so they built up instead of out.',
+          tags: ['Opened 1912', 'Green Monster \u2014 37\u00a0ft 2\u00a0in', '37,755 seats'],
+        },
+        {
+          id: 'wrigley', label: 'Wrigley', accent: '#0E3386',
+          still: 'assets/wrigley.jpg',
+          clip: 'assets/vid/dive-wrigley.mp4',
+          clipMobile: 'assets/vid/dive-wrigley-m.mp4',
+          scroll: 1.6, linger: 0.38,
+          eyebrow: 'Chicago \u00b7 1914',
+          title: 'Ivy on brick, scoreboard by hand.',
+          body: 'Two years younger than Fenway and just as stubborn. The outfield ' +
+                'wall grows its own padding, and the center-field scoreboard has ' +
+                'been turned by hand from the inside since 1937.',
+          tags: ['Opened 1914', 'Ivy planted 1937', 'Lights arrived 1988'],
+        },
+        {
+          id: 'oracle', label: 'Oracle Park', accent: '#FD5A1E',
+          still: 'assets/oracle.jpg',
+          clip: 'assets/vid/dive-oracle.mp4',
+          clipMobile: 'assets/vid/dive-oracle-m.mp4',
+          scroll: 1.5,
+          eyebrow: 'San Francisco \u00b7 2000',
+          title: 'Right field is the Bay.',
+          body: 'A 24-foot wall in right \u2014 Willie Mays\u2019 number \u2014 and ' +
+                'past it, open water. Kayakers idle in McCovey Cove waiting for the ' +
+                'ball that clears everything.',
+          tags: ['Opened 2000', '24\u00a0ft right-field wall', 'McCovey Cove'],
+        },
+        {
+          id: 'pnc', label: 'PNC Park', accent: '#FDB827',
+          still: 'assets/pnc.jpg',
+          clip: 'assets/vid/dive-pnc.mp4',
+          clipMobile: 'assets/vid/dive-pnc-m.mp4',
+          scroll: 1.6, linger: 0.45,
+          eyebrow: 'Pittsburgh \u00b7 2001',
+          title: 'Two decks, on purpose.',
+          body: 'Built deliberately small so nothing sits between you and the ' +
+                'Allegheny, the yellow spans of the Clemente Bridge, and the ' +
+                'skyline behind them. Widely called the best view in the sport.',
+          tags: ['Opened 2001', 'Only two decks', 'Clemente Bridge'],
+        },
+        {
+          id: 'dodger', label: 'Dodger Stadium', accent: '#005A9C',
+          still: 'assets/dodger.jpg',
+          clip: 'assets/vid/dive-dodger.mp4',
+          clipMobile: 'assets/vid/dive-dodger-m.mp4',
+          scroll: 1.5,
+          eyebrow: 'Los Angeles \u00b7 1962',
+          title: 'Carved into a hillside.',
+          body: 'Terraced into Chavez Ravine so every seating level enters at its ' +
+                'own grade \u2014 park on your tier, walk straight in. Still the ' +
+                'largest ballpark in baseball by capacity.',
+          tags: ['Opened 1962', '56,000 seats', 'Chavez Ravine'],
+        },
+        {
+          id: 'camden', label: 'Camden Yards', accent: '#DF4601',
+          still: 'assets/camden.jpg',
+          clip: 'assets/vid/dive-camden.mp4',
+          clipMobile: 'assets/vid/dive-camden-m.mp4',
+          scroll: 1.7,
+          eyebrow: 'And it all traces back to',
+          title: 'The park that reset the century.',
+          body: 'Camden Yards put brick, asymmetry and a downtown back into the ' +
+                'ballpark, and nearly everything built since has copied it. The ' +
+                'B&O Warehouse behind right field runs 1,016 feet \u2014 the longest ' +
+                'building on the East Coast.',
+          tags: ['Opened 1992', 'B&O Warehouse \u2014 1,016\u00a0ft'],
+          cta: {
+            primary:   { label: 'Fly it again', href: '#top' },
+            secondary: { label: 'MLB ballparks', href: 'https://www.mlb.com/ballparks' },
+          },
+        },
+      ],
+
+      // One connector per gap, in order. Each one opens on the previous dive's
+      // exact final frame and closes on the next dive's exact first frame, so
+      // the camera never cuts across the whole 14-screen flight.
+      connectors: [
+        'assets/vid/conn-0.mp4',
+        'assets/vid/conn-1.mp4',
+        'assets/vid/conn-2.mp4',
+        'assets/vid/conn-3.mp4',
+        'assets/vid/conn-4.mp4',
+      ],
+      connectorsMobile: [
+        'assets/vid/conn-0-m.mp4',
+        'assets/vid/conn-1-m.mp4',
+        'assets/vid/conn-2-m.mp4',
+        'assets/vid/conn-3-m.mp4',
+        'assets/vid/conn-4-m.mp4',
+      ],
+    });
+  </script>
+</body>
+</html>

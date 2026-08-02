@@ -1,0 +1,9 @@
+build/node_modules/
+build/package-lock.json
+build/__pycache__/
+build/shots*/
+build/candidates/
+build/originals/
+build/frames/
+build/sheet-*.png
+build/sheet-*.jpg
