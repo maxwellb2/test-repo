@@ -2,19 +2,17 @@
 var graph = require('ngraph.graph')();
 var renderGraph = require('ngraph.pixel');
 
-var nodeNames = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank'];
+var nodeCount = 30;
 
-nodeNames.forEach(function (name) {
-  graph.addNode(name, { label: name });
-});
+for (var i = 0; i < nodeCount; ++i) {
+  graph.addNode(i, { label: 'Node ' + i });
+}
 
-graph.addLink('Alice', 'Bob');
-graph.addLink('Alice', 'Charlie');
-graph.addLink('Bob', 'Diana');
-graph.addLink('Charlie', 'Diana');
-graph.addLink('Diana', 'Eve');
-graph.addLink('Eve', 'Frank');
-graph.addLink('Frank', 'Alice');
+for (var from = 0; from < nodeCount; ++from) {
+  for (var to = from + 1; to < nodeCount; to += 3) {
+    graph.addLink(from, to);
+  }
+}
 
 var renderer = renderGraph(graph, {
   node: function (node) {
