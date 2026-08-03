@@ -1,1 +1,0 @@
-print("Sathira Stinks")

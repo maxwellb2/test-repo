@@ -1,9 +1,12 @@
 {
-  "name": "ngraph-pixel-example",
+  "name": "hilbert-ring",
   "private": true,
+  "description": "Maximum-stretch connected graph: a degree-2 Hilbert-curve ring rendered with ngraph.pixel.",
   "scripts": {
     "build": "browserify index.js > bundle.js",
-    "start": "python3 -m http.server 8080"
+    "start": "python3 -m http.server 8080",
+    "test": "node test/hilbert.test.js",
+    "memory": "node --expose-gc test/memory.js"
   },
   "dependencies": {
     "ngraph.graph": "^0.0.12",

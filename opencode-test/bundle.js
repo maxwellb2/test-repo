@@ -1,47 +1,420 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-var graph = require('ngraph.graph')();
 var renderGraph = require('ngraph.pixel');
+var resolveSettings = require('./lib/settings.js');
+var buildRing = require('./lib/buildRing.js');
+var createStaticLayout = require('./lib/staticLayout.js');
+var createPalette = require('./lib/palette.js');
 
-var nodeCount = 30;
+var settings = resolveSettings(window.location.search);
+var statusEl = document.getElementById('status');
+var hudEl = document.getElementById('hud');
 
-for (var i = 0; i < nodeCount; ++i) {
-  graph.addNode(i, { label: 'Node ' + i });
+setStatus('Building ' + settings.count.toLocaleString() + ' node Hilbert ring…');
+
+// Yield once so the loading text paints before we block the main thread.
+requestAnimationFrame(function () {
+  setTimeout(boot, 0);
+});
+
+function boot() {
+  var started = performance.now();
+  var ring = buildRing(settings);
+  var palette = createPalette(settings.paletteSteps, settings.edgeDim);
+  var builtAt = performance.now();
+
+  setStatus('Uploading ' + ring.count.toLocaleString() + ' nodes to the GPU…');
+
+  requestAnimationFrame(function () {
+    var renderer = renderGraph(ring.graph, {
+      container: document.getElementById('scene'),
+      autoFit: true,
+      clearColor: settings.background,
+      // Skip the makeActive proxy wrappers - with a static layout they only cost
+      // memory (one Map + property getters per node and per edge).
+      activeNode: false,
+      activeLink: false,
+      createLayout: createStaticLayout(ring.positions),
+      node: function (node) {
+        return {
+          color: palette.node[node.id % palette.steps],
+          size: settings.size
+        };
+      },
+      link: function (link) {
+        // Colour the edge by the midpoint of the two nodes so it blends into
+        // the rainbow rather than looking like a separate overlay.
+        var mid = ((link.fromId + link.toId) / 2) | 0;
+        var color = palette.edge[mid % palette.steps];
+        return {
+          fromColor: color,
+          toColor: color
+        };
+      }
+    });
+
+    // Pull the camera far enough back that the initial autofit doesn't clip
+    // the corners of a large cube (PerspectiveCamera.far defaults to 20000).
+    var camera = renderer.camera();
+    camera.far = Math.max(20000, ring.radius * 20);
+    camera.updateProjectionMatrix();
+
+    var announced = false;
+    renderer.on('stable', function () {
+      if (announced) return;
+      announced = true;
+
+      var elapsed = performance.now() - started;
+      showHud({
+        nodes: ring.count,
+        edges: ring.graph.getLinksCount(),
+        order: settings.order,
+        spacing: settings.spacing,
+        size: settings.size,
+        buildMs: Math.round(builtAt - started),
+        totalMs: Math.round(elapsed),
+        radius: Math.round(ring.radius)
+      });
+      hideStatus();
+    });
+  });
 }
 
-for (var from = 0; from < nodeCount; ++from) {
-  for (var to = from + 1; to < nodeCount; to += 3) {
-    graph.addLink(from, to);
+function setStatus(text) {
+  if (!statusEl) return;
+  statusEl.textContent = text;
+  statusEl.hidden = false;
+}
+
+function hideStatus() {
+  if (!statusEl) return;
+  statusEl.hidden = true;
+}
+
+function showHud(info) {
+  if (!hudEl) return;
+  hudEl.hidden = false;
+  hudEl.innerHTML =
+    '<div class="title">Hilbert ring</div>' +
+    '<div><b>' + info.nodes.toLocaleString() + '</b> nodes · <b>' +
+      info.edges.toLocaleString() + '</b> edges</div>' +
+    '<div>order ' + info.order + ' · spacing ' + info.spacing +
+      ' · size ' + info.size + '</div>' +
+    '<div>built ' + info.buildMs + ' ms · ready ' + info.totalMs + ' ms</div>' +
+    '<div class="hint">WASD move · RF up/down · drag look · QE roll</div>' +
+    '<div class="hint">?order=6&amp;count=262144&amp;spacing=14&amp;size=8</div>';
+}
+
+},{"./lib/buildRing.js":2,"./lib/palette.js":4,"./lib/settings.js":5,"./lib/staticLayout.js":6,"ngraph.pixel":28}],2:[function(require,module,exports){
+var createGraph = require('ngraph.graph');
+var hilbert3d = require('./hilbert3d.js');
+
+module.exports = buildRing;
+
+/**
+ * Builds the graph we render: a single closed ring threaded along a 3d Hilbert
+ * curve.
+ *
+ * Every node has exactly two neighbours (the previous and the next point on the
+ * curve) and the last node links back to the first, so the whole thing is one
+ * cycle - connected, no stragglers, and exactly one edge per node no matter how
+ * many nodes we ask for.
+ *
+ * @param {Object} options
+ * @param {number} options.order - Hilbert order. Cube is 2^order cells per side.
+ * @param {number} options.count - how many nodes to place (<= 8^order).
+ * @param {number} options.spacing - world distance between neighbouring nodes.
+ * @returns {Object} { graph, positions, count, radius, spacing }
+ */
+function buildRing(options) {
+  var order = options.order;
+  var spacing = options.spacing;
+  var total = hilbert3d.pointCount(order);
+  var count = Math.max(2, Math.min(options.count || total, total));
+
+  var side = hilbert3d.sideLength(order);
+  var offset = (side - 1) / 2;
+
+  // uniqueLinkId costs an O(degree) lookup per link and a hash table we never
+  // read; the curve can't produce duplicate edges, so turn it off.
+  var graph = createGraph({ uniqueLinkId: false });
+  var positions = new Array(count);
+
+  hilbert3d(order, count, function (x, y, z, index) {
+    positions[index] = {
+      x: (x - offset) * spacing,
+      y: (y - offset) * spacing,
+      z: (z - offset) * spacing
+    };
+
+    // No per-node data object: at this scale that allocation alone is tens of
+    // megabytes, and the id already tells us everything we show.
+    graph.addNode(index);
+    if (index > 0) graph.addLink(index - 1, index);
+  });
+
+  graph.addLink(count - 1, 0);
+
+  return {
+    graph: graph,
+    positions: positions,
+    count: count,
+    spacing: spacing,
+    // Half the diagonal of the filled cube - what the camera has to clear.
+    radius: (side - 1) * spacing * Math.sqrt(3) / 2
+  };
+}
+
+},{"./hilbert3d.js":3,"ngraph.graph":18}],3:[function(require,module,exports){
+/**
+ * Generates points of a 3d Hilbert curve.
+ *
+ * The curve is what lets us push the node count so high: it visits every cell
+ * of a 2^order cube exactly once, consecutive points are always one cell apart,
+ * and nearby points on the curve stay nearby in space. That gives us a very
+ * long, evenly spread path - the maximum amount of "visible graph" you can pack
+ * into a viewing volume before nodes start overlapping each other on screen.
+ */
+module.exports = walk;
+module.exports.pointCount = pointCount;
+module.exports.sideLength = sideLength;
+
+var DIMENSIONS = 3;
+
+function pointCount(order) {
+  return Math.pow(8, order);
+}
+
+function sideLength(order) {
+  return Math.pow(2, order);
+}
+
+/**
+ * Visits the first `count` points of an order-`order` curve, in curve order.
+ *
+ * @param {number} order - number of subdivisions. Cube side is 2^order.
+ * @param {number} count - how many points to visit. Any prefix of the curve is
+ *   itself a connected path, so this can be smaller than 8^order.
+ * @param {Function} visit - called as visit(x, y, z, index) with integer
+ *   coordinates in [0, 2^order).
+ */
+function walk(order, count, visit) {
+  var axes = [0, 0, 0];
+
+  for (var index = 0; index < count; ++index) {
+    indexToAxes(index, order, axes);
+    visit(axes[0], axes[1], axes[2], index);
   }
 }
 
-var renderer = renderGraph(graph, {
-  node: function (node) {
-    return {
-      color: 0x4285F4,
-      size: 30
-    };
-  },
-  link: function () {
-    return {
-      fromColor: 0xEA4335,
-      toColor: 0xFBBC05
-    };
+function indexToAxes(index, order, out) {
+  out[0] = 0;
+  out[1] = 0;
+  out[2] = 0;
+
+  // Split the index into `order` groups of three bits, most significant first.
+  // Each group contributes one bit to every axis, which produces Skilling's
+  // "transpose" form of the index.
+  for (var i = 0; i < order; ++i) {
+    var shift = order - 1 - i;
+    var triple = (index >>> (3 * shift)) & 7;
+
+    out[0] |= ((triple >>> 2) & 1) << shift;
+    out[1] |= ((triple >>> 1) & 1) << shift;
+    out[2] |= (triple & 1) << shift;
   }
-});
 
-renderer.on('nodeclick', function (node) {
-  var ui = renderer.getNode(node.id);
-  ui.color = 0x34A853;
-  console.log('Clicked node:', node.data.label);
-});
+  transposeToAxes(out, order);
+}
 
-renderer.on('nodehover', function (node) {
-  if (node) {
-    document.title = 'Hovering: ' + node.data.label;
+/**
+ * Skilling's transpose-to-axes conversion (Programming the Hilbert curve, 2004).
+ */
+function transposeToAxes(X, bits) {
+  var side = 1 << bits;
+  var i, t, p, q;
+
+  // Gray decode.
+  t = X[DIMENSIONS - 1] >>> 1;
+  for (i = DIMENSIONS - 1; i > 0; --i) X[i] ^= X[i - 1];
+  X[0] ^= t;
+
+  // Undo excess work.
+  for (q = 2; q !== side; q <<= 1) {
+    p = q - 1;
+    for (i = DIMENSIONS - 1; i >= 0; --i) {
+      if (X[i] & q) {
+        X[0] ^= p;
+      } else {
+        t = (X[0] ^ X[i]) & p;
+        X[0] ^= t;
+        X[i] ^= t;
+      }
+    }
   }
-});
+}
 
-},{"ngraph.graph":13,"ngraph.pixel":23}],2:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
+module.exports = createPalette;
+
+/**
+ * Precomputes a rainbow ramp that we index by position along the ring, so the
+ * colour of a node tells you where you are on the curve. Edges get a darker
+ * shade of the same hue: at this density fully lit edges wash out the nodes.
+ *
+ * Precomputed because at a quarter million nodes even a cheap HSL conversion
+ * per node is wasted work - a few thousand steps are indistinguishable from a
+ * continuous ramp.
+ *
+ * @param {number} steps - how many distinct colours to generate.
+ * @param {number} edgeDim - 0..1 lightness multiplier applied to edge colours.
+ */
+function createPalette(steps, edgeDim) {
+  var node = new Array(steps);
+  var edge = new Array(steps);
+
+  for (var i = 0; i < steps; ++i) {
+    var hue = i / steps;
+    node[i] = hslToHex(hue, 0.85, 0.62);
+    edge[i] = hslToHex(hue, 0.85, 0.62 * edgeDim);
+  }
+
+  return {
+    steps: steps,
+    node: node,
+    edge: edge
+  };
+}
+
+function hslToHex(h, s, l) {
+  var c = (1 - Math.abs(2 * l - 1)) * s;
+  var hp = h * 6;
+  var x = c * (1 - Math.abs((hp % 2) - 1));
+  var m = l - c / 2;
+  var r = 0, g = 0, b = 0;
+
+  if (hp < 1) { r = c; g = x; }
+  else if (hp < 2) { r = x; g = c; }
+  else if (hp < 3) { g = c; b = x; }
+  else if (hp < 4) { g = x; b = c; }
+  else if (hp < 5) { r = x; b = c; }
+  else { r = c; b = x; }
+
+  return (to255(r + m) << 16) | (to255(g + m) << 8) | to255(b + m);
+}
+
+function to255(v) {
+  return Math.max(0, Math.min(255, Math.round(v * 255)));
+}
+
+},{}],5:[function(require,module,exports){
+var hilbert3d = require('./hilbert3d.js');
+
+module.exports = resolveSettings;
+
+/**
+ * Default settings are tuned for a modern laptop: order 6 fills a 64^3 cube
+ * (262 144 nodes) for about 200 MB of JS heap plus ~80 MB of WebGL buffers.
+ * Order 7 would be another 8x and pushes past a gigabyte - still reachable via
+ * the URL, but not the default.
+ *
+ * Override any of them from the query string, e.g.
+ *   ?order=5&spacing=20&size=14
+ */
+function resolveSettings(search) {
+  var query = parseQuery(search || '');
+
+  var order = clampInt(query.order, 1, 7, 6);
+  var maxCount = hilbert3d.pointCount(order);
+  var count = clampInt(query.count, 2, maxCount, maxCount);
+  var spacing = clampNumber(query.spacing, 1, 200, defaultSpacing(order));
+  var size = clampNumber(query.size, 1, 80, defaultSize(order, count));
+
+  return {
+    order: order,
+    count: count,
+    spacing: spacing,
+    size: size,
+    // Small enough that consecutive nodes on the rainbow still look distinct,
+    // large enough that we never recompute HSL at runtime.
+    paletteSteps: 2048,
+    edgeDim: 0.45,
+    background: 0x05070b
+  };
+}
+
+function defaultSpacing(order) {
+  // Keep the filled cube roughly the same screen size as the order grows, so
+  // switching between orders doesn't fling the camera into empty space.
+  return Math.max(4, Math.round(900 / hilbert3d.sideLength(order)));
+}
+
+function defaultSize(order, count) {
+  // Point size is in "pixel-ish" units the shader scales by distance. Smaller
+  // as density rises so neighbouring nodes don't blot each other out.
+  if (count >= 1000000) return 6;
+  if (count >= 200000) return 8;
+  if (count >= 30000) return 12;
+  return 18;
+}
+
+function parseQuery(search) {
+  var out = Object.create(null);
+  var raw = search.charAt(0) === '?' ? search.slice(1) : search;
+  if (!raw) return out;
+
+  raw.split('&').forEach(function (pair) {
+    if (!pair) return;
+    var parts = pair.split('=');
+    var key = decodeURIComponent(parts[0]);
+    var value = decodeURIComponent(parts.slice(1).join('=') || '');
+    out[key] = value;
+  });
+  return out;
+}
+
+function clampInt(value, min, max, fallback) {
+  var n = parseInt(value, 10);
+  if (!isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+function clampNumber(value, min, max, fallback) {
+  var n = parseFloat(value);
+  if (!isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+},{"./hilbert3d.js":3}],6:[function(require,module,exports){
+module.exports = createStaticLayout;
+
+/**
+ * A layout provider for ngraph.pixel that hands back precomputed positions.
+ *
+ * The default force layout is what normally caps the node count: it runs a
+ * Barnes-Hut simulation step on every frame and never converges on a graph this
+ * size. Reporting "stable" on the first step means the renderer uploads the
+ * vertex buffers once and then does nothing but draw.
+ *
+ * @param {Array} positions - {x, y, z} indexed by node id.
+ */
+function createStaticLayout(positions) {
+  return function () {
+    return {
+      step: step,
+      getNodePosition: getNodePosition
+    };
+  };
+
+  function step() {
+    return true; // already stable, never simulate.
+  }
+
+  function getNodePosition(nodeId) {
+    return positions[nodeId];
+  }
+}
+
+},{}],7:[function(require,module,exports){
 module.exports = function(opts) {
   return new ElementClass(opts)
 }
@@ -102,7 +475,7 @@ ElementClass.prototype.toggle = function(className) {
   else this.add(className)
 }
 
-},{}],3:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 var inserted = {};
 
 module.exports = function (css, options) {
@@ -126,7 +499,7 @@ module.exports = function (css, options) {
     }
 };
 
-},{}],4:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 module.exports = function(subject) {
   validateSubject(subject);
 
@@ -216,7 +589,7 @@ function validateSubject(subject) {
   }
 }
 
-},{}],5:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 module.exports = exposeProperties;
 
 /**
@@ -262,7 +635,7 @@ function augment(source, target, key) {
   }
 }
 
-},{}],6:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 module.exports = createLayout;
 module.exports.simulator = require('ngraph.physics.simulator');
 
@@ -577,7 +950,7 @@ function createLayout(graph, physicsSettings) {
 
 function noop() { }
 
-},{"ngraph.events":4,"ngraph.physics.simulator":16}],7:[function(require,module,exports){
+},{"ngraph.events":9,"ngraph.physics.simulator":21}],12:[function(require,module,exports){
 /**
  * This module provides all required forces to regular ngraph.physics.simulator
  * to make it 3D simulator. Ideally ngraph.physics.simulator should operate
@@ -601,7 +974,7 @@ function createLayout(graph, physicsSettings) {
   return createLayout.get2dLayout(graph, physicsSettings);
 }
 
-},{"./lib/bounds":8,"./lib/createBody":9,"./lib/dragForce":10,"./lib/eulerIntegrator":11,"./lib/springForce":12,"ngraph.forcelayout":6,"ngraph.merge":14,"ngraph.quadtreebh3d":43}],8:[function(require,module,exports){
+},{"./lib/bounds":13,"./lib/createBody":14,"./lib/dragForce":15,"./lib/eulerIntegrator":16,"./lib/springForce":17,"ngraph.forcelayout":11,"ngraph.merge":19,"ngraph.quadtreebh3d":48}],13:[function(require,module,exports){
 module.exports = function (bodies, settings) {
   var random = require('ngraph.random').random(42);
   var boundingBox =  { x1: 0, y1: 0, z1: 0, x2: 0, y2: 0, z2: 0 };
@@ -700,14 +1073,14 @@ module.exports = function (bodies, settings) {
   }
 };
 
-},{"ngraph.random":47}],9:[function(require,module,exports){
+},{"ngraph.random":52}],14:[function(require,module,exports){
 var physics = require('ngraph.physics.primitives');
 
 module.exports = function(pos) {
   return new physics.Body3d(pos);
 }
 
-},{"ngraph.physics.primitives":15}],10:[function(require,module,exports){
+},{"ngraph.physics.primitives":20}],15:[function(require,module,exports){
 /**
  * Represents 3d drag force, which reduces force value on each step by given
  * coefficient.
@@ -737,7 +1110,7 @@ module.exports = function (options) {
   return api;
 };
 
-},{"ngraph.expose":5,"ngraph.merge":14}],11:[function(require,module,exports){
+},{"ngraph.expose":10,"ngraph.merge":19}],16:[function(require,module,exports){
 /**
  * Performs 3d forces integration, using given timestep. Uses Euler method to solve
  * differential equation (http://en.wikipedia.org/wiki/Euler_method ).
@@ -787,7 +1160,7 @@ function integrate(bodies, timeStep) {
   return (tx * tx + ty * ty + tz * tz)/bodies.length;
 }
 
-},{}],12:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 /**
  * Represents 3d spring force, which updates forces acting on two bodies, conntected
  * by a spring.
@@ -843,7 +1216,7 @@ module.exports = function (options) {
   return api;
 }
 
-},{"ngraph.expose":5,"ngraph.merge":14,"ngraph.random":47}],13:[function(require,module,exports){
+},{"ngraph.expose":10,"ngraph.merge":19,"ngraph.random":52}],18:[function(require,module,exports){
 /**
  * @fileOverview Contains definition of the core graph object.
  */
@@ -1422,7 +1795,7 @@ function makeLinkId(fromId, toId) {
   return hashCode(fromId.toString() + '👉 ' + toId.toString());
 }
 
-},{"ngraph.events":4}],14:[function(require,module,exports){
+},{"ngraph.events":9}],19:[function(require,module,exports){
 module.exports = merge;
 
 /**
@@ -1455,7 +1828,7 @@ function merge(target, options) {
   return target;
 }
 
-},{}],15:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 module.exports = {
   Body: Body,
   Vector2d: Vector2d,
@@ -1522,7 +1895,7 @@ Vector3d.prototype.reset = function () {
   this.x = this.y = this.z = 0;
 };
 
-},{}],16:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 /**
  * Manages a simulation of physical forces acting on bodies and springs.
  */
@@ -1800,7 +2173,7 @@ function physicsSimulator(settings) {
   }
 };
 
-},{"./lib/bounds":17,"./lib/createBody":18,"./lib/dragForce":19,"./lib/eulerIntegrator":20,"./lib/spring":21,"./lib/springForce":22,"ngraph.events":4,"ngraph.expose":5,"ngraph.merge":14,"ngraph.quadtreebh":39}],17:[function(require,module,exports){
+},{"./lib/bounds":22,"./lib/createBody":23,"./lib/dragForce":24,"./lib/eulerIntegrator":25,"./lib/spring":26,"./lib/springForce":27,"ngraph.events":9,"ngraph.expose":10,"ngraph.merge":19,"ngraph.quadtreebh":44}],22:[function(require,module,exports){
 module.exports = function (bodies, settings) {
   var random = require('ngraph.random').random(42);
   var boundingBox =  { x1: 0, y1: 0, x2: 0, y2: 0 };
@@ -1882,14 +2255,14 @@ module.exports = function (bodies, settings) {
   }
 }
 
-},{"ngraph.random":47}],18:[function(require,module,exports){
+},{"ngraph.random":52}],23:[function(require,module,exports){
 var physics = require('ngraph.physics.primitives');
 
 module.exports = function(pos) {
   return new physics.Body(pos);
 }
 
-},{"ngraph.physics.primitives":15}],19:[function(require,module,exports){
+},{"ngraph.physics.primitives":20}],24:[function(require,module,exports){
 /**
  * Represents drag force, which reduces force value on each step by given
  * coefficient.
@@ -1918,7 +2291,7 @@ module.exports = function (options) {
   return api;
 };
 
-},{"ngraph.expose":5,"ngraph.merge":14}],20:[function(require,module,exports){
+},{"ngraph.expose":10,"ngraph.merge":19}],25:[function(require,module,exports){
 /**
  * Performs forces integration, using given timestep. Uses Euler method to solve
  * differential equation (http://en.wikipedia.org/wiki/Euler_method ).
@@ -1965,7 +2338,7 @@ function integrate(bodies, timeStep) {
   return (tx * tx + ty * ty)/max;
 }
 
-},{}],21:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 module.exports = Spring;
 
 /**
@@ -1981,7 +2354,7 @@ function Spring(fromBody, toBody, length, coeff, weight) {
     this.weight = typeof weight === 'number' ? weight : 1;
 };
 
-},{}],22:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 /**
  * Represents spring force, which updates forces acting on two bodies, conntected
  * by a spring.
@@ -2033,7 +2406,7 @@ module.exports = function (options) {
   return api;
 }
 
-},{"ngraph.expose":5,"ngraph.merge":14,"ngraph.random":47}],23:[function(require,module,exports){
+},{"ngraph.expose":10,"ngraph.merge":19,"ngraph.random":52}],28:[function(require,module,exports){
 var THREE = require('three');
 
 module.exports = pixel;
@@ -2521,7 +2894,7 @@ function verifyContainerDimensions(container) {
   }
 }
 
-},{"./lib/autoFit.js":24,"./lib/edgeView.js":27,"./lib/flyTo.js":28,"./lib/input.js":30,"./lib/makeActive.js":32,"./lib/nodeView.js":35,"./lib/tooltip.js":36,"./options.js":37,"ngraph.events":4,"three":51}],24:[function(require,module,exports){
+},{"./lib/autoFit.js":29,"./lib/edgeView.js":32,"./lib/flyTo.js":33,"./lib/input.js":35,"./lib/makeActive.js":37,"./lib/nodeView.js":40,"./lib/tooltip.js":41,"./options.js":42,"ngraph.events":9,"three":56}],29:[function(require,module,exports){
 var flyTo = require('./flyTo.js');
 module.exports = createAutoFit;
 
@@ -2543,7 +2916,7 @@ function createAutoFit(nodeView, camera) {
   }
 }
 
-},{"./flyTo.js":28}],25:[function(require,module,exports){
+},{"./flyTo.js":33}],30:[function(require,module,exports){
 var THREE = require('three');
 
 module.exports = createParticleMaterial;
@@ -2577,10 +2950,10 @@ function createParticleMaterial() {
   return material;
 }
 
-},{"./defaultTexture.js":26,"./node-fragment.js":33,"./node-vertex.js":34,"three":51}],26:[function(require,module,exports){
+},{"./defaultTexture.js":31,"./node-fragment.js":38,"./node-vertex.js":39,"three":56}],31:[function(require,module,exports){
 module.exports = 'data:image/png;base64,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';
 
-},{}],27:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 var THREE = require('three');
 
 module.exports = edgeView;
@@ -2733,7 +3106,7 @@ function edgeView(scene, options) {
   }
 }
 
-},{"three":51}],28:[function(require,module,exports){
+},{"three":56}],33:[function(require,module,exports){
 /**
  * Moves camera to given point, and stops it and given radius
  */
@@ -2758,7 +3131,7 @@ function flyTo(camera, to, radius) {
   camera.position.z = cameraEndPos.z;
 }
 
-},{"./intersect.js":31,"three":51}],29:[function(require,module,exports){
+},{"./intersect.js":36,"three":56}],34:[function(require,module,exports){
 /**
  * Gives an index of a node under mouse coordinates
  */
@@ -3012,7 +3385,7 @@ function createHitTest(domElement) {
   }
 }
 
-},{"ngraph.events":4,"three":51}],30:[function(require,module,exports){
+},{"ngraph.events":9,"three":56}],35:[function(require,module,exports){
 var FlyControls = require('three.fly');
 var eventify = require('ngraph.events');
 var THREE = require('three');
@@ -3092,7 +3465,7 @@ function createInput(camera, graph, domElement) {
   }
 }
 
-},{"./hitTest.js":29,"ngraph.events":4,"three":51,"three.fly":49}],31:[function(require,module,exports){
+},{"./hitTest.js":34,"ngraph.events":9,"three":56,"three.fly":54}],36:[function(require,module,exports){
 module.exports = intersect;
 
 /**
@@ -3118,7 +3491,7 @@ function intersect(from, to, r) {
   };
 }
 
-},{}],32:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 // This module allows to replace object properties with getters/setters,
 // so consumers can "connect" to them and be notified when properties are
 // updated.
@@ -3258,7 +3631,7 @@ function makeActive(model) {
   }
 }
 
-},{}],33:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 module.exports = [
   'uniform vec3 color;',
   'uniform sampler2D texture;',
@@ -3273,7 +3646,7 @@ module.exports = [
   '}'
 ].join('\n');
 
-},{}],34:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 module.exports = [
 'attribute float size;',
 'attribute vec3 customColor;',
@@ -3288,7 +3661,7 @@ module.exports = [
 '}'
 ].join('\n');
 
-},{}],35:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 var THREE = require('three');
 
 module.exports = nodeView;
@@ -3430,7 +3803,7 @@ function nodeView(scene, options) {
   }
 }
 
-},{"./createMaterial.js":25,"three":51}],36:[function(require,module,exports){
+},{"./createMaterial.js":30,"three":56}],41:[function(require,module,exports){
 /**
  * manages view for tooltips shown when user hover over a node
  */
@@ -3477,7 +3850,7 @@ function createTooltipView(container) {
   }
 }
 
-},{"../style/style.js":38,"element-class":2,"insert-css":3}],37:[function(require,module,exports){
+},{"../style/style.js":43,"element-class":7,"insert-css":8}],42:[function(require,module,exports){
 /**
  * This file contains all possible configuration optins for the renderer
  */
@@ -3555,7 +3928,7 @@ function defaultLink(/* link */) {
   return { fromColor: 0xFFFFFF,  toColor: 0xFFFFFF };
 }
 
-},{"pixel.layout":48}],38:[function(require,module,exports){
+},{"pixel.layout":53}],43:[function(require,module,exports){
 module.exports = [
 '.ngraph-tooltip {',
 '  position: absolute;',
@@ -3565,7 +3938,7 @@ module.exports = [
 '  background: rgba(0, 0, 0, 0.6);',
 '}'].join('\n');
 
-},{}],39:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 /**
  * This is Barnes Hut simulation algorithm for 2d case. Implementation
  * is highly optimized (avoids recusion and gc pressure)
@@ -3891,7 +4264,7 @@ function setChild(node, idx, child) {
   else if (idx === 3) node.quad3 = child;
 }
 
-},{"./insertStack":40,"./isSamePosition":41,"./node":42,"ngraph.random":47}],40:[function(require,module,exports){
+},{"./insertStack":45,"./isSamePosition":46,"./node":47,"ngraph.random":52}],45:[function(require,module,exports){
 module.exports = InsertStack;
 
 /**
@@ -3935,7 +4308,7 @@ function InsertStackElement(node, body) {
     this.body = body; // physical body which needs to be inserted to node
 }
 
-},{}],41:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 module.exports = function isSamePosition(point1, point2) {
     var dx = Math.abs(point1.x - point2.x);
     var dy = Math.abs(point1.y - point2.y);
@@ -3943,7 +4316,7 @@ module.exports = function isSamePosition(point1, point2) {
     return (dx < 1e-8 && dy < 1e-8);
 };
 
-},{}],42:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 /**
  * Internal data structure to represent 2D QuadTree node
  */
@@ -3975,7 +4348,7 @@ module.exports = function Node() {
   this.right = 0;
 };
 
-},{}],43:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 /**
  * This is Barnes Hut simulation algorithm for 3d case. Implementation
  * is highly optimized (avoids recusion and gc pressure)
@@ -4370,7 +4743,7 @@ function setChild(node, idx, child) {
   else if (idx === 7) node.quad7 = child;
 }
 
-},{"./insertStack":44,"./isSamePosition":45,"./node":46,"ngraph.random":47}],44:[function(require,module,exports){
+},{"./insertStack":49,"./isSamePosition":50,"./node":51,"ngraph.random":52}],49:[function(require,module,exports){
 module.exports = InsertStack;
 
 /**
@@ -4414,7 +4787,7 @@ function InsertStackElement(node, body) {
     this.body = body; // physical body which needs to be inserted to node
 }
 
-},{}],45:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 module.exports = function isSamePosition(point1, point2) {
     var dx = Math.abs(point1.x - point2.x);
     var dy = Math.abs(point1.y - point2.y);
@@ -4423,7 +4796,7 @@ module.exports = function isSamePosition(point1, point2) {
     return (dx < 1e-8 && dy < 1e-8 && dz < 1e-8);
 };
 
-},{}],46:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 /**
  * Internal data structure to represent 3D QuadTree node
  */
@@ -4467,7 +4840,7 @@ module.exports = function Node() {
   this.back = 0;
 };
 
-},{}],47:[function(require,module,exports){
+},{}],52:[function(require,module,exports){
 module.exports = {
   random: random,
   randomIterator: randomIterator
@@ -4554,7 +4927,7 @@ function randomIterator(array, customRandom) {
     };
 }
 
-},{}],48:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 /**
  * Creates a force based layout that can be switched between 3d and 2d modes
  * Layout is used by ngraph.pixel
@@ -4708,7 +5081,7 @@ function createLayout(graph, options) {
   }
 }
 
-},{"ngraph.events":4,"ngraph.forcelayout3d":7}],49:[function(require,module,exports){
+},{"ngraph.events":9,"ngraph.forcelayout3d":12}],54:[function(require,module,exports){
 /**
  * @author James Baicoianu / http://www.baicoianu.com/
  * Source: https://github.com/mrdoob/three.js/blob/master/examples/js/controls/FlyControls.js
@@ -4986,7 +5359,7 @@ function fly(camera, domElement, THREE) {
   }
 }
 
-},{"./keymap.js":50,"ngraph.events":4}],50:[function(require,module,exports){
+},{"./keymap.js":55,"ngraph.events":9}],55:[function(require,module,exports){
 /**
  * Defines default key bindings for the controls
  */
@@ -5009,7 +5382,7 @@ function createKeyMap() {
   };
 }
 
-},{}],51:[function(require,module,exports){
+},{}],56:[function(require,module,exports){
 var self = self || {};// File:src/Three.js
 
 /**
