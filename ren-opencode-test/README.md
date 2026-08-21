@@ -37,6 +37,7 @@ AI coding assistance without ever handling a provider API key.
 │   ├── test-proxy-routing.sh      # Tiers, prompt cache, SSE streaming
 │   ├── test-key-controls.sh       # Budget enforcement + model allowlist
 │   └── test-fallbacks.sh          # Tier-3 -> tier-2 failover
+├── DEPLOYMENT-CHECKLIST.md        # Phased rollout tracker with owners
 └── .env.example
 ```
 
@@ -48,6 +49,9 @@ This repo is a pilot harness, not a production deployment. See
 [Before this is a working prototype](#before-this-is-a-working-prototype) for what still needs to be
 configured or decided — hosting and TLS, secret storage, rate limits, data governance, and the
 success metrics the pilot is supposed to produce.
+
+To actually run the rollout, work through [DEPLOYMENT-CHECKLIST.md](DEPLOYMENT-CHECKLIST.md), which
+sequences the same material into owned, phased tasks.
 
 ## Deployment
 
