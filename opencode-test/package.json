@@ -1,7 +1,7 @@
 {
   "name": "hilbert-ring",
   "private": true,
-  "description": "Maximum-stretch connected graph: a degree-2 Hilbert-curve ring rendered with ngraph.pixel.",
+  "description": "Ten-million-node connected degree-2 Hilbert ring in one packed WebGL buffer.",
   "scripts": {
     "build": "browserify index.js > bundle.js",
     "start": "python3 -m http.server 8080",

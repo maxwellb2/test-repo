@@ -7,9 +7,16 @@
  * long, evenly spread path - the maximum amount of "visible graph" you can pack
  * into a viewing volume before nodes start overlapping each other on screen.
  */
-module.exports = walk;
-module.exports.pointCount = pointCount;
-module.exports.sideLength = sideLength;
+// CommonJS in the build/tests, a global when loaded directly by the Web Worker.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = walk;
+  module.exports.pointCount = pointCount;
+  module.exports.sideLength = sideLength;
+} else {
+  self.hilbert3d = walk;
+  self.hilbert3d.pointCount = pointCount;
+  self.hilbert3d.sideLength = sideLength;
+}
 
 var DIMENSIONS = 3;
 
