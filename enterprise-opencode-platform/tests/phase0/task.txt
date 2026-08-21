@@ -1,0 +1,1 @@
+npm test is failing. Run it, read src/stats.js, fix the implementation so all three tests pass, then run the tests again to confirm they pass. Do not modify anything under test/.

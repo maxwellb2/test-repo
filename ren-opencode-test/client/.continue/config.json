@@ -1,0 +1,46 @@
+{
+  "$schema": "https://raw.githubusercontent.com/continuedev/continue/main/docs/static/schemas/config.json",
+  "models": [
+    {
+      "title": "Tier 2 - Balanced (Default Chat)",
+      "provider": "openai",
+      "model": "tier-2-balanced",
+      "apiBase": "http://YOUR_LITELLM_PROXY_URL:4000/v1",
+      "apiKey": "${DEVELOPER_VIRTUAL_KEY}"
+    },
+    {
+      "title": "Tier 3 - Flagship (Complex Reasoning)",
+      "provider": "openai",
+      "model": "tier-3-flagship",
+      "apiBase": "http://YOUR_LITELLM_PROXY_URL:4000/v1",
+      "apiKey": "${DEVELOPER_VIRTUAL_KEY}"
+    },
+    {
+      "title": "Tier 1 - Fast (Quick Inline Edits)",
+      "provider": "openai",
+      "model": "tier-1-fast",
+      "apiBase": "http://YOUR_LITELLM_PROXY_URL:4000/v1",
+      "apiKey": "${DEVELOPER_VIRTUAL_KEY}"
+    }
+  ],
+  "tabAutocompleteModel": {
+    "title": "Tier 1 - Fast Autocomplete",
+    "provider": "openai",
+    "model": "tier-1-fast",
+    "apiBase": "http://YOUR_LITELLM_PROXY_URL:4000/v1",
+    "apiKey": "${DEVELOPER_VIRTUAL_KEY}"
+  },
+  "tabAutocompleteOptions": {
+    "maxPromptTokens": 1024,
+    "debounceDelay": 350,
+    "multilineCompletions": "auto"
+  },
+  "customCommands": [
+    {
+      "name": "test",
+      "prompt": "Write unit tests for the selected code using standard testing libraries.",
+      "description": "Generate unit tests"
+    }
+  ],
+  "allowAnonymousTelemetry": false
+}

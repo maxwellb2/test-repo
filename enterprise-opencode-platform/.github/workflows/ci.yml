@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly model-drift check. Providers retire slugs and change capabilities
+    # without notice, and a dead tier is invisible until a developer hits it.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Verification suite
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Lint shell scripts
+        run: shellcheck -S warning scripts/*.sh hooks/pre-commit tests/run-tests.sh
+
+      - name: Install OpenCode CLI
+        run: |
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Run verification suite
+        run: tests/run-tests.sh
+
+      - name: Validate compose file
+        run: docker compose -f docker/docker-compose.yml config --quiet
+        env:
+          OPENROUTER_API_KEY: ci-placeholder
+          LITELLM_MASTER_KEY: ci-placeholder
+          LITELLM_SALT_KEY: ci-placeholder
+          POSTGRES_PASSWORD: ci-placeholder
+
+  model-drift:
+    name: Model tier drift check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check every tier still exists and supports tool calling
+        run: scripts/check-credentials.sh --models

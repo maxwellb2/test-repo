@@ -1,0 +1,10 @@
+# Secrets. Nothing in here should ever reach the remote.
+docker/.env
+.env
+*.local.json
+!templates/opencode.local.json
+
+# Test harness scratch space
+tests/.tmp/
+tests/phase0/results/
+node_modules/

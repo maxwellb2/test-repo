@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "custom-proxy": {
+      "options": {
+        "baseURL": "http://localhost:4000/v1",
+        "apiKey": "REPLACE_WITH_DEVELOPER_TEAM_KEY"
+      }
+    }
+  }
+}

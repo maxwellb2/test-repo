@@ -1,0 +1,50 @@
+model_list:
+  # Tier 1: Fast / Autocomplete / Quick Edits
+  - model_name: tier-1-fast
+    litellm_params:
+      model: openrouter/qwen/qwen-2.5-coder-32b-instruct
+      api_key: os.environ/OPENROUTER_API_KEY
+    model_info:
+      tier: "1"
+      intended_use: autocomplete, inline edits
+
+  # Tier 2: Balanced Chat & Standard Refactoring
+  - model_name: tier-2-balanced
+    litellm_params:
+      model: openrouter/deepseek/deepseek-chat
+      api_key: os.environ/OPENROUTER_API_KEY
+    model_info:
+      tier: "2"
+      intended_use: default chat, standard refactoring
+
+  # Tier 3: Flagship Architecture & Multi-file Reasoning
+  - model_name: tier-3-flagship
+    litellm_params:
+      model: openrouter/anthropic/claude-3.7-sonnet
+      api_key: os.environ/OPENROUTER_API_KEY
+    model_info:
+      tier: "3"
+      intended_use: architecture, multi-file reasoning
+
+litellm_settings:
+  cache: true
+  cache_params:
+    type: local
+    ttl: 3600
+    supported_call_types: ["completion", "acompletion"]
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+  # Continue.dev sends provider-specific params that not every backend accepts.
+  drop_params: true
+  request_timeout: 600
+
+router_settings:
+  routing_strategy: usage-based-routing-v2
+  num_retries: 2
+  fallbacks:
+    - tier-3-flagship: ["tier-2-balanced"]
+    - tier-2-balanced: ["tier-1-fast"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL

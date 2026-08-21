@@ -1,0 +1,10 @@
+{
+  "name": "phase0-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deliberately broken module used to measure whether a model can drive the full OpenCode agent loop.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

@@ -1,0 +1,117 @@
+# LiteLLM gateway configuration for the Enterprise OpenCode Platform.
+#
+# Three model tiers are exposed to developers. OpenCode only ever sees the tier
+# alias, so the underlying OpenRouter model can be swapped here without touching
+# a single developer machine.
+#
+# Costs are per-token and mirror OpenRouter list pricing. They are declared
+# explicitly so that /spend endpoints and per-key budgets stay accurate even for
+# models LiteLLM does not have in its bundled cost map.
+
+model_list:
+  # NOTE: the original spec named qwen/qwen-2.5-coder-32b-instruct. OpenRouter
+  # reports no `tools` support for that model, so it cannot drive an agent loop
+  # or serve the pre-commit hook. qwen3-coder-30b-a3b-instruct is tool-capable,
+  # has 8x the context, and is ~9x cheaper on input.
+  - model_name: tier-1-fast
+    litellm_params:
+      model: openrouter/qwen/qwen3-coder-30b-a3b-instruct
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.00000007
+      output_cost_per_token: 0.00000028
+      rpm: 500
+      tpm: 400000
+    model_info:
+      mode: chat
+      max_input_tokens: 262144
+      tier: 1
+
+  - model_name: tier-2-balanced
+    litellm_params:
+      model: openrouter/deepseek/deepseek-chat
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.0000002574
+      output_cost_per_token: 0.0000010287
+      rpm: 300
+      tpm: 300000
+    model_info:
+      mode: chat
+      max_input_tokens: 163840
+      tier: 2
+
+  # NOTE: the original spec named anthropic/claude-3.7-sonnet. That slug has
+  # been retired by OpenRouter; claude-sonnet-4.6 is its current equivalent.
+  - model_name: tier-3-flagship
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-4.6
+      api_key: os.environ/OPENROUTER_API_KEY
+      input_cost_per_token: 0.000003
+      output_cost_per_token: 0.000015
+      cache_read_input_token_cost: 0.0000003
+      cache_creation_input_token_cost: 0.00000375
+      rpm: 100
+      tpm: 200000
+    model_info:
+      mode: chat
+      max_input_tokens: 1000000
+      tier: 3
+
+router_settings:
+  routing_strategy: usage-based-routing-v2
+  redis_host: os.environ/REDIS_HOST
+  redis_port: os.environ/REDIS_PORT
+  # Never hard-fail a developer's session because the flagship tier is rate
+  # limited or degraded; step down a tier instead.
+  fallbacks:
+    - tier-3-flagship: ["tier-2-balanced"]
+    - tier-2-balanced: ["tier-1-fast"]
+  allowed_fails: 3
+  cooldown_time: 30
+  num_retries: 2
+
+litellm_settings:
+  # Prompt caching is the single largest cost lever here: OpenCode replays a
+  # large, mostly-static system prompt plus AGENTS.md on every turn.
+  cache: true
+  cache_params:
+    type: redis
+    host: os.environ/REDIS_HOST
+    port: os.environ/REDIS_PORT
+    ttl: 3600
+    supported_call_types: ["completion", "acompletion"]
+
+  # Langfuse ingests every request as a trace: model, prompt length, tool calls,
+  # latency, token counts, cost and errors.
+  success_callback: ["langfuse"]
+  failure_callback: ["langfuse"]
+
+  # Providers reject unknown sampling params; OpenCode sends a superset.
+  drop_params: true
+  request_timeout: 600
+  set_verbose: false
+
+  # Org-wide ceiling. Per-developer ceilings live on the virtual keys created by
+  # scripts/create-dev-key.sh.
+  max_budget: 5000
+  budget_duration: 30d
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  store_model_in_db: true
+  # Surfaces per-key spend at GET /key/info and in the LiteLLM admin UI.
+  track_cost_per_model: true
+  health_check_interval: 300
+
+# --- OpenTelemetry (optional) -------------------------------------------------
+# The native Langfuse callback above is the default because it needs no
+# collector. To emit raw OTLP spans instead (for example into an existing
+# collector, or into Langfuse's OTel endpoint at /api/public/otel), delete the
+# success_callback/failure_callback lines above, uncomment the block below, and
+# set OTEL_EXPORTER_OTLP_ENDPOINT + OTEL_EXPORTER_OTLP_HEADERS in docker/.env.
+#
+# litellm_settings:
+#   callbacks: ["otel"]
+#
+# environment_variables:
+#   OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf

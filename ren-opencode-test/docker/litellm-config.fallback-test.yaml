@@ -1,0 +1,39 @@
+# Test fixture ONLY - never used by the pilot stack.
+#
+# tier-3-flagship deliberately points at a non-existent OpenRouter slug so the
+# router is forced down the fallback chain. LiteLLM strips mock_testing_fallbacks
+# from proxy requests (v1.85.0+), so making the primary deployment genuinely
+# unavailable is the supported way to exercise fallbacks end to end.
+#
+# Started on a spare port by scripts/test-fallbacks.sh. No database and no
+# Langfuse callbacks: this proxy only needs to route.
+
+model_list:
+  - model_name: tier-1-fast
+    litellm_params:
+      model: openrouter/qwen/qwen-2.5-coder-32b-instruct
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: tier-2-balanced
+    litellm_params:
+      model: openrouter/deepseek/deepseek-chat
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: tier-3-flagship
+    litellm_params:
+      model: openrouter/anthropic/nonexistent-model-fallback-probe
+      api_key: os.environ/OPENROUTER_API_KEY
+
+litellm_settings:
+  drop_params: true
+  request_timeout: 120
+
+router_settings:
+  # Fail straight to the fallback instead of retrying a model that cannot exist.
+  num_retries: 0
+  fallbacks:
+    - tier-3-flagship: ["tier-2-balanced"]
+    - tier-2-balanced: ["tier-1-fast"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
